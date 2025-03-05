@@ -12,11 +12,11 @@ import (
 
 
 type ChatRepository struct {
-	database mongo.Database
+	database *mongo.Database
 	collection string
 }
 
-func NewChatRepository (database mongo.Database, collection string) domain.ChatRepository {
+func NewChatRepository (database *mongo.Database, collection string) domain.ChatRepository {
 	return &ChatRepository{database: database, collection: collection}
 }
 
