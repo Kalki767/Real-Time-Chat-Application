@@ -13,3 +13,10 @@ type Message struct {
 	Content   string             `json:"content" bson:"content"`
 	Time      time.Time          `json:"time" bson:"time"`
 }
+
+type MessageRepository interface {
+	SendMessage(chatID primitive.ObjectID, message *Message) error
+	GetMessages(chatID primitive.ObjectID) ([]Message, error)
+	GetMessage(chatID, messageID primitive.ObjectID) (*Message, error) 
+	DeleteMessage(chatID, messageID primitive.ObjectID) error
+}

@@ -16,3 +16,12 @@ type User struct {
 	CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
 	UpdatedAt  time.Time          `json:"updated_at" bson:"updated_at"`
 }
+
+type UserRepository interface {
+	CreateUser(user *User) (primitive.ObjectID, error)
+	GetUser(userID primitive.ObjectID) (*User, error)
+	GetUserByEmail(email string) (*User, error)
+	GetUserByUsername(username string) (*User, error)
+	UpdateUser(userID primitive.ObjectID, user *User) error
+	DeleteUser(userID primitive.ObjectID) error
+}
