@@ -1,11 +1,11 @@
 package domain
 
 import (
+	"context"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
-
 
 // Chat represents a chat between two users.
 type Chat struct {
@@ -17,9 +17,9 @@ type Chat struct {
 }
 
 type ChatRepository interface {
-	CreateChat(chat *Chat) (primitive.ObjectID, error)
-	GetChat(chatID primitive.ObjectID) (*Chat, error)
-	GetChatsByUserID(userID primitive.ObjectID) ([]Chat, error)
-	UpdateChat(chatID primitive.ObjectID, chat *Chat) error
-	DeleteChat(chatID primitive.ObjectID) error
+	CreateChat(ctx context.Context, chat *Chat) (primitive.ObjectID, error)
+	GetChat(ctx context.Context, chatID primitive.ObjectID) (*Chat, error)
+	GetChatsByUserID(ctx context.Context, userID primitive.ObjectID) ([]Chat, error)
+	UpdateChat(ctx context.Context, chatID primitive.ObjectID, chat *Chat) error
+	DeleteChat(ctx context.Context, chatID primitive.ObjectID) error
 }
