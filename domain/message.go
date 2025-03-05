@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -15,8 +16,8 @@ type Message struct {
 }
 
 type MessageRepository interface {
-	SendMessage(chatID primitive.ObjectID, message *Message) error
-	GetMessages(chatID primitive.ObjectID) ([]Message, error)
-	GetMessage(chatID, messageID primitive.ObjectID) (*Message, error) 
-	DeleteMessage(chatID, messageID primitive.ObjectID) error
+	SendMessage(ctx context.Context, chatID primitive.ObjectID, message *Message) error
+	GetMessages(ctx context.Context, chatID primitive.ObjectID) ([]Message, error)
+	GetMessage(ctx context.Context, chatID, messageID primitive.ObjectID) (*Message, error) 
+	DeleteMessage(ctx context.Context, chatID, messageID primitive.ObjectID) error
 }
