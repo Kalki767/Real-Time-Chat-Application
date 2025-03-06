@@ -13,11 +13,13 @@ type Message struct {
 	SenderID  primitive.ObjectID `json:"sender_id" bson:"sender_id"`
 	Content   string             `json:"content" bson:"content"`
 	Time      time.Time          `json:"time" bson:"time"`
+	Edited    bool               `json:"edited" bson:"edited"`
 }
 
 type MessageRepository interface {
 	SendMessage(ctx context.Context, chatID primitive.ObjectID, message *Message) error
 	GetMessages(ctx context.Context, chatID primitive.ObjectID) ([]Message, error)
-	GetMessage(ctx context.Context, chatID, messageID primitive.ObjectID) (*Message, error) 
+	GetMessage(ctx context.Context, chatID, messageID primitive.ObjectID) (Message, error) 
 	DeleteMessage(ctx context.Context, chatID, messageID primitive.ObjectID) error
+	UpdateMessage(ctx context.Context, chatID, messageID primitive.ObjectID, message *Message) error
 }
