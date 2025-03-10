@@ -4,6 +4,7 @@ import (
 	"Real-Time-Chat-Application/domain"
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -11,9 +12,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// ChatRepository is a struct that defines the ChatRepository type
+// send message sends a message between two people who have already been chatting. It accepts the chatId and the message to send
 func(chatrepo *ChatRepository) SendMessage(ctx context.Context, chatID primitive.ObjectID, message *domain.Message) error {
 
-	collection := chatrepo.database.Collection(chatrepo.collection)
+	collection := chatrepo.collection
 
 	// add a time stamp to the message
 	message.MessageID = primitive.NewObjectID()
@@ -35,49 +38,55 @@ func(chatrepo *ChatRepository) SendMessage(ctx context.Context, chatID primitive
 
 }
 
+// Get messages will retrieve all the available messages based on their time stamp from the specific chat required
 func(chatrepo *ChatRepository) GetMessages(ctx context.Context, chatID primitive.ObjectID) ([]domain.Message, error) {
 
-	collection := chatrepo.database.Collection(chatrepo.collection)
+	collection := chatrepo.collection
 
 	//get the messages using the chatID
 	var chat domain.Chat
 
+	//if the required chat doesn't exist in the database return there is no message to retireve with
 	err := collection.FindOne(ctx,bson.M{"_id":chatID}).Decode(&chat)
 	if err != nil {
-		return chat.Messages, fmt.Errorf("failed to fetch chat: %w", err)
+		return []domain.Message{}, fmt.Errorf("failed to fetch chat: %w", err)
 	}
 
+	sort.Slice(chat.Messages, func(i,j int) bool {
+		return chat.Messages[i].Time.Before(chat.Messages[j].Time)
+	})
+
+	//otherwise return list of messages in sorted order
 	return chat.Messages, nil
 
 }
 
+// Getmessage returns a specific message given the message id from a specific chat
 func(chatrepo *ChatRepository) GetMessage(ctx context.Context, chatID, messageID primitive.ObjectID) (domain.Message, error) {
 
-	collection := chatrepo.database.Collection(chatrepo.collection)
+	collection := chatrepo.collection
 
-	//get the messages using the chatID
-	var chat domain.Chat
-
-	var message domain.Message
-	err := collection.FindOne(ctx,bson.M{"_id":chatID}).Decode(&chat)
-	if err != nil {
-		return message, fmt.Errorf("failed to fetch chat: %w", err)
-	}
-
+	// declare the parameters to retrieve the specified message from the chat list
+	filter := bson.M{"_id":chatID, "messages.messageID":messageID}
+	projection := bson.M{"messages.$": 1}
 	
+	// declare a list that will be type of message
+	var result []domain.Message
 
-	for _, msg := range chat.Messages {
-		if msg.MessageID == messageID {
-			return msg, nil
-		}
+	// retrieve the specified message from the database
+	err := collection.FindOne(ctx, filter, options.FindOne().SetProjection(projection)).Decode(&result)
+	if err != nil {
+		return domain.Message{}, fmt.Errorf("failed to fetch chat: %w", err)
 	}
-	return message, fmt.Errorf("message not found")
+
+	//if the message is found return the message
+	return result[0], nil
 
 }
 
 func(chatrepo *ChatRepository) DeleteMessage(ctx context.Context, chatID, messageID primitive.ObjectID) error{
 
-	collection := chatrepo.database.Collection(chatrepo.collection)
+	collection := chatrepo.collection
 
 	// Pull the message from the "messages" array in the chat document
 	update := bson.M{
@@ -91,6 +100,7 @@ func(chatrepo *ChatRepository) DeleteMessage(ctx context.Context, chatID, messag
 		return fmt.Errorf("failed to delete message: %w", err)
 	}
 
+	//if no entry was modified return an error message
 	if result.ModifiedCount == 0 {
 		return fmt.Errorf("message not found or already deleted")
 	}
@@ -100,13 +110,14 @@ func(chatrepo *ChatRepository) DeleteMessage(ctx context.Context, chatID, messag
 }
 
 func (chatrepo *ChatRepository) UpdateMessage(ctx context.Context, chatID, messageID primitive.ObjectID, newContent string) error {
-	collection := chatrepo.database.Collection(chatrepo.collection)
+	collection := chatrepo.collection
 
 	// Define the update query
 	update := bson.M{
 		"$set": bson.M{
 			"messages.$[elem].content": newContent, // Update the message content
-			"messages.$[elem].edited":  true,       // Mark the message as edited
+			"messages.$[elem].edited":  true,       // Mark the message as 
+			"updated_at": time.Now(),
 		},
 	}
 

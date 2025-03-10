@@ -4,6 +4,7 @@ import (
 	"Real-Time-Chat-Application/domain"
 	"context"
 	"fmt"
+	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -12,17 +13,29 @@ import (
 
 
 type ChatRepository struct {
-	database *mongo.Database
-	collection string
+	collection *mongo.Collection
 }
 
 func NewChatRepository (database *mongo.Database, collection string) domain.ChatRepository {
-	return &ChatRepository{database: database, collection: collection}
+	repo := &ChatRepository{collection: database.Collection(collection)}
+
+	// Ensure an index on message_id for faster lookups
+	coll := database.Collection(collection)
+	indexModel := mongo.IndexModel{
+		Keys: bson.M{"messages.message_id": 1},
+	}
+	_, err := coll.Indexes().CreateOne(context.TODO(), indexModel)
+	if err != nil {
+		log.Fatal("Failed to create index:", err)
+	}
+
+	return repo
 }
 
 func(chatrepo *ChatRepository) CreateChat(ctx context.Context,chat *domain.Chat) (primitive.ObjectID, error) {
 
-	collection := chatrepo.database.Collection(chatrepo.collection)
+	collection := chatrepo.collection
+
 	result, err := collection.InsertOne(ctx, chat)
 	if err != nil {
 		return primitive.NilObjectID, fmt.Errorf("failed to create chat: %w", err)
@@ -32,7 +45,7 @@ func(chatrepo *ChatRepository) CreateChat(ctx context.Context,chat *domain.Chat)
 }
 func(chatrepo *ChatRepository) GetChat(ctx context.Context, chatID primitive.ObjectID) (*domain.Chat, error) {
 
-	collection := chatrepo.database.Collection(chatrepo.collection)
+	collection := chatrepo.collection
 	var chat domain.Chat
 	err := collection.FindOne(ctx, bson.M{"_id": chatID}).Decode(&chat)
 	if err != nil {
@@ -46,7 +59,7 @@ func(chatrepo *ChatRepository) GetChat(ctx context.Context, chatID primitive.Obj
 }
 func(chatrepo *ChatRepository) GetChatsByUserID(ctx context.Context, userID primitive.ObjectID) ([]domain.Chat, error) {
 
-	collection := chatrepo.database.Collection(chatrepo.collection)
+	collection := chatrepo.collection
 	cursor, err := collection.Find(ctx, bson.M{"participants": userID})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch chats: %w", err)
@@ -69,7 +82,7 @@ func(chatrepo *ChatRepository) GetChatsByUserID(ctx context.Context, userID prim
 }
 func(chatrepo *ChatRepository) UpdateChat(ctx context.Context, chatID primitive.ObjectID, chat *domain.Chat) error {
 
-	collection := chatrepo.database.Collection(chatrepo.collection)
+	collection := chatrepo.collection
 	_, err := collection.UpdateOne(ctx, bson.M{"_id": chatID}, bson.M{"$set": chat})
 	if err != nil {
 		return fmt.Errorf("failed to update chat: %w", err)
@@ -78,7 +91,7 @@ func(chatrepo *ChatRepository) UpdateChat(ctx context.Context, chatID primitive.
 }
 func(chatrepo *ChatRepository) DeleteChat(ctx context.Context, chatID primitive.ObjectID) error {
 
-	collection := chatrepo.database.Collection(chatrepo.collection)
+	collection := chatrepo.collection
 	_, err := collection.DeleteOne(ctx, bson.M{"_id": chatID})
 	if err != nil {
 		return fmt.Errorf("failed to delete chat: %w", err)
