@@ -4,32 +4,19 @@ import (
 	"Real-Time-Chat-Application/domain"
 	"context"
 	"fmt"
-	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-
+// ChatRepository is a struct for the chat repository
 type ChatRepository struct {
-	collection *mongo.Collection
+	collection CollectionInterface // Use the interface here
 }
 
-func NewChatRepository (database *mongo.Database, collection string) domain.ChatRepository {
-	repo := &ChatRepository{collection: database.Collection(collection)}
-
-	// Ensure an index on message_id for faster lookups
-	coll := database.Collection(collection)
-	indexModel := mongo.IndexModel{
-		Keys: bson.M{"messages.message_id": 1},
-	}
-	_, err := coll.Indexes().CreateOne(context.TODO(), indexModel)
-	if err != nil {
-		log.Fatal("Failed to create index:", err)
-	}
-
-	return repo
+func NewChatRepository(collection CollectionInterface) domain.ChatRepository {
+	return &ChatRepository{collection: collection}
 }
 
 func(chatrepo *ChatRepository) CreateChat(ctx context.Context,chat *domain.Chat) (primitive.ObjectID, error) {
