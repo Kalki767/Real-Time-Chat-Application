@@ -25,9 +25,9 @@ func (m *MockCollection) FindOne(ctx context.Context, filter interface{}, opts .
 	return args.Get(0).(repository.SingleResultInterface)
 }
 
-func (m *MockCollection) Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (*mongo.Cursor, error) {
+func (m *MockCollection) Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (repository.CursorInterface, error) {
 	args := m.Called(ctx, filter)
-	return args.Get(0).(*mongo.Cursor), args.Error(1)
+	return args.Get(0).(repository.CursorInterface), args.Error(1)
 }
 
 func (m *MockCollection) UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
@@ -39,3 +39,4 @@ func (m *MockCollection) DeleteOne(ctx context.Context, filter interface{}, opts
 	args := m.Called(ctx, filter)
 	return args.Get(0).(*mongo.DeleteResult), args.Error(1)
 }
+
