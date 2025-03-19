@@ -74,39 +74,92 @@ func TestGetChat(t *testing.T) {
 }
 
 func TestGetChatsByUserID(t *testing.T) {
-	// Setup
+	// Create mock collection and cursor
 	mockCollection := new(mocks.MockCollection)
-	cursor := new(mocks.MockCursor)
-	repo := repository.NewChatRepository(mockCollection)
+	mockCursor := new(mocks.MockCursor)
 
+	// Create a sample user ID
 	userID := primitive.NewObjectID()
-	chatID := primitive.NewObjectID()
-	expectedChats := []domain.Chat{
-		{
-			ChatID:       chatID,
-			Participants: []primitive.ObjectID{userID},
-			Messages:     []domain.Message{},
-		},
+
+	// Create a sample chat
+	expectedChat := domain.Chat{
+		ChatID:       primitive.NewObjectID(),
+		Participants: []primitive.ObjectID{userID},
+		Messages:     []domain.Message{},
 	}
 
-	// Mock Find
-	mockCollection.On("Find", mock.Anything, bson.M{"participants": userID}).Return(cursor, nil)
+	// Set up expectations for Find to return the mock cursor
+	mockCollection.On("Find", mock.Anything, bson.M{"participants": userID}).Return(mockCursor, nil)
 
-	// Mock cursor
-	cursor.On("Next", mock.Anything).Return(true).Once()
-	cursor.On("Next", mock.Anything).Return(false).Once()
-	cursor.On("Decode", mock.Anything).Run(func(args mock.Arguments) {
+	// Set up expectations for the mock cursor
+	mockCursor.On("Next", mock.Anything).Return(true).Once()
+	mockCursor.On("Decode", mock.Anything).Run(func(args mock.Arguments) {
 		arg := args.Get(0).(*domain.Chat)
-		*arg = expectedChats[0]
-	}).Return(nil).Once()
-	cursor.On("Close", mock.Anything).Return(nil).Once()
+		*arg = expectedChat
+	}).Return(nil)
+	mockCursor.On("Next", mock.Anything).Return(false).Once()
+	mockCursor.On("Close", mock.Anything).Return(nil)
+	mockCursor.On("Err").Return(nil)
+
+	// Create repository
+	chatrepo := repository.NewChatRepository(mockCollection)
+
+	// Call the function
+	chats, err := chatrepo.GetChatsByUserID(context.TODO(), userID)
+
+	// Assertions
+	assert.NoError(t, err)
+	assert.Len(t, chats, 1)
+	assert.Equal(t, expectedChat, chats[0])
+
+	// Verify expectations
+	mockCollection.AssertExpectations(t)
+	mockCursor.AssertExpectations(t)
+}
+
+func TestUpdateChat(t *testing.T) {
+	// Setup
+	mockCollection := new(mocks.MockCollection)
+	repo := repository.NewChatRepository(mockCollection)
+
+	chatID := primitive.NewObjectID()
+	chat := &domain.Chat{
+		ChatID:       chatID,
+		Participants: []primitive.ObjectID{primitive.NewObjectID()},
+		Messages:     []domain.Message{},
+	}
+
+	// Create a mock response for UpdateOne (MongoDB returns *mongo.UpdateResult)
+	updateResult := &mongo.UpdateResult{MatchedCount: 1, ModifiedCount: 1}
+
+	// Mock UpdateOne to return the updateResult and nil error
+	mockCollection.On("UpdateOne", mock.Anything, bson.M{"_id": chatID}, bson.M{"$set": chat}).Return(updateResult, nil)
 
 	// Execute
-	chats, err := repo.GetChatsByUserID(context.TODO(), userID)
+	err := repo.UpdateChat(context.TODO(), chatID, chat)
 
 	// Verify
 	assert.NoError(t, err)
-	assert.Equal(t, expectedChats, chats)
 	mockCollection.AssertExpectations(t)
-	cursor.AssertExpectations(t)
+}
+
+func TestDeleteChat(t *testing.T) {
+	//set up 
+	mockCollection := new(mocks.MockCollection)
+	repo := repository.NewChatRepository(mockCollection)
+
+	chatID := primitive.NewObjectID()
+
+	// Create a mock response for DeleteOne (MongoDB returns *mongo.DeleteResult)
+	deleteResult := &mongo.DeleteResult{DeletedCount: 1}
+
+	// Mock DeleteOne to return the deleteResult and nil error
+	mockCollection.On("DeleteOne", mock.Anything, bson.M{"_id": chatID}).Return(deleteResult, nil)
+
+	//Execute
+	err := repo.DeleteChat(context.TODO(), chatID)
+
+	//Verify
+	assert.NoError(t, err)
+	mockCollection.AssertExpectations(t)
 }
