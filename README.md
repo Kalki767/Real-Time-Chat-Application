@@ -79,3 +79,4 @@ The project follows clean architecture principles with clear separation of conce
   - Implements interfaces defined by inner layers
   - Handles external communications
   - Located in `/infrastructure` directory
+  
