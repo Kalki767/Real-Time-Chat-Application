@@ -14,7 +14,7 @@ import (
 
 	"Real-Time-Chat-Application/domain"
 	"Real-Time-Chat-Application/repository"
-	"Real-Time-Chat-Application/test/mocks"
+	"Real-Time-Chat-Application/test/mongo/mocks"
 )
 
 func TestCreateUser(t *testing.T) {
