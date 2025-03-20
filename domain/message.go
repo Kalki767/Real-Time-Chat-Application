@@ -21,5 +21,13 @@ type MessageRepository interface {
 	GetMessages(ctx context.Context, chatID primitive.ObjectID) ([]Message, error)
 	GetMessage(ctx context.Context, chatID, messageID primitive.ObjectID) (Message, error) 
 	DeleteMessage(ctx context.Context, chatID, messageID primitive.ObjectID) error
-	UpdateMessage(ctx context.Context, chatID, messageID primitive.ObjectID, message *Message) error
+	UpdateMessage(ctx context.Context, chatID, messageID primitive.ObjectID, newContent string) error
+}
+
+type MessageUsecase interface {
+	SendMessage(ctx context.Context, chatID primitive.ObjectID, message *Message) error
+	GetMessages(ctx context.Context, chatID primitive.ObjectID) ([]Message, error)
+	GetMessage(ctx context.Context, chatID, messageID primitive.ObjectID) (Message, error) 
+	DeleteMessage(ctx context.Context, chatID, messageID primitive.ObjectID) error
+	UpdateMessage(ctx context.Context, chatID, messageID primitive.ObjectID, newContent string) error
 }
