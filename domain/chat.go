@@ -23,3 +23,11 @@ type ChatRepository interface {
 	UpdateChat(ctx context.Context, chatID primitive.ObjectID, chat *Chat) error
 	DeleteChat(ctx context.Context, chatID primitive.ObjectID) error
 }
+
+type ChatUsecase interface {
+	CreateChat(ctx context.Context, chat *Chat) (primitive.ObjectID, error)
+	GetChat(ctx context.Context, chatID primitive.ObjectID) (*Chat, error)
+	GetChatsByUserID(ctx context.Context, userID primitive.ObjectID) ([]Chat, error)
+	UpdateChat(ctx context.Context, chatID primitive.ObjectID, chat *Chat) error
+	DeleteChat(ctx context.Context, chatID primitive.ObjectID) error
+}
