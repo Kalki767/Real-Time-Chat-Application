@@ -20,7 +20,7 @@ import (
 func TestSendMessage(t *testing.T) {
 	// Setup
 	mockCollection := new(mocks.MockCollection)
-	repo := repository.NewChatRepository(mockCollection) 
+	repo := repository.NewMessageRepository(mockCollection) 
 
 	chatID := primitive.NewObjectID()
 	message := &domain.Message{
@@ -51,7 +51,7 @@ func TestGetMessage(t *testing.T) {
 	// Create a mock collection and single result
 	mockCollection := new(mocks.MockCollection)
 	mockSingleResult := new(mocks.MockSingleResult)
-	chatRepo := repository.NewChatRepository(mockCollection)
+	chatRepo := repository.NewMessageRepository(mockCollection)
 
 	// Generate common ObjectIDs for consistency
 	commonChatID := primitive.NewObjectID()
@@ -101,7 +101,7 @@ func TestGetMessage(t *testing.T) {
 			// Reset mocks before each test
 			mockCollection = new(mocks.MockCollection)
 			mockSingleResult = new(mocks.MockSingleResult)
-			chatRepo = repository.NewChatRepository(mockCollection)
+			chatRepo = repository.NewMessageRepository(mockCollection)
 
 			// Mock the expected FindOne call
 			mockCollection.On("FindOne", mock.Anything, bson.M{"_id": tt.chatID, "messages.messageID": tt.messageID}, mock.Anything).
@@ -196,7 +196,7 @@ func TestGetMessages(t *testing.T) {
 			// Reset mocks before each test
 			mockCollection = new(mocks.MockCollection)
 			mockSingleResult = new(mocks.MockSingleResult)
-			chatRepo := repository.NewChatRepository(mockCollection)
+			chatRepo := repository.NewMessageRepository(mockCollection)
 
 			// Mock FindOne
 			mockCollection.On("FindOne", mock.Anything, bson.M{"_id": tt.chatID}).Return(mockSingleResult)
@@ -274,7 +274,7 @@ func TestDeleteMessage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset mocks
 			mockCollection = new(mocks.MockCollection)
-			chatRepo := repository.NewChatRepository(mockCollection)
+			chatRepo := repository.NewMessageRepository(mockCollection)
 
 			// Mock UpdateOne with MatchedBy to handle time.Now()
 			mockCollection.On("UpdateOne", 
@@ -353,7 +353,7 @@ func TestUpdateMessage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset mocks
 			mockCollection = new(mocks.MockCollection)
-			chatRepo := repository.NewChatRepository(mockCollection)
+			chatRepo := repository.NewMessageRepository(mockCollection)
 
 			// Mock UpdateOne correctly with 4 parameters
 			mockCollection.On("UpdateOne",
