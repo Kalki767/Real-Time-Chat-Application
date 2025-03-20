@@ -12,11 +12,18 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+type MessageRepository struct {
+	collection CollectionInterface
+}
+
+func NewMessageRepository(collection CollectionInterface) domain.MessageRepository {
+	return &MessageRepository{collection: collection}
+}
 // ChatRepository is a struct that defines the ChatRepository type
 // send message sends a message between two people who have already been chatting. It accepts the chatId and the message to send
-func(chatrepo *ChatRepository) SendMessage(ctx context.Context, chatID primitive.ObjectID, message *domain.Message) error {
+func(messageRepo *MessageRepository) SendMessage(ctx context.Context, chatID primitive.ObjectID, message *domain.Message) error {
 
-	collection := chatrepo.collection
+	collection := messageRepo.collection
 
 	// add a time stamp to the message
 	message.MessageID = primitive.NewObjectID()
@@ -39,9 +46,9 @@ func(chatrepo *ChatRepository) SendMessage(ctx context.Context, chatID primitive
 }
 
 // Get messages will retrieve all the available messages based on their time stamp from the specific chat required
-func(chatrepo *ChatRepository) GetMessages(ctx context.Context, chatID primitive.ObjectID) ([]domain.Message, error) {
+func(messageRepo *MessageRepository) GetMessages(ctx context.Context, chatID primitive.ObjectID) ([]domain.Message, error) {
 
-	collection := chatrepo.collection
+	collection := messageRepo.collection
 
 	//get the messages using the chatID
 	var chat domain.Chat
@@ -62,9 +69,9 @@ func(chatrepo *ChatRepository) GetMessages(ctx context.Context, chatID primitive
 }
 
 // Getmessage returns a specific message given the message id from a specific chat
-func(chatrepo *ChatRepository) GetMessage(ctx context.Context, chatID, messageID primitive.ObjectID) (domain.Message, error) {
+func(messageRepo *MessageRepository) GetMessage(ctx context.Context, chatID, messageID primitive.ObjectID) (domain.Message, error) {
 
-	collection := chatrepo.collection
+	collection := messageRepo.collection
 
 	// declare the parameters to retrieve the specified message from the chat list
 	filter := bson.M{"_id":chatID, "messages.messageID":messageID}
@@ -84,9 +91,9 @@ func(chatrepo *ChatRepository) GetMessage(ctx context.Context, chatID, messageID
 
 }
 
-func(chatrepo *ChatRepository) DeleteMessage(ctx context.Context, chatID, messageID primitive.ObjectID) error{
+func(messageRepo *MessageRepository) DeleteMessage(ctx context.Context, chatID, messageID primitive.ObjectID) error{
 
-	collection := chatrepo.collection
+	collection := messageRepo.collection
 
 	// Pull the message from the "messages" array in the chat document
 	update := bson.M{
@@ -109,8 +116,8 @@ func(chatrepo *ChatRepository) DeleteMessage(ctx context.Context, chatID, messag
 	
 }
 
-func (chatrepo *ChatRepository) UpdateMessage(ctx context.Context, chatID, messageID primitive.ObjectID, newContent string) error {
-	collection := chatrepo.collection
+func (messageRepo *MessageRepository) UpdateMessage(ctx context.Context, chatID, messageID primitive.ObjectID, newContent string) error {
+	collection := messageRepo.collection
 
 	// Define the update query
 	update := bson.M{
