@@ -8,15 +8,14 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type UserRepository struct {
-	collection *mongo.Collection
+	collection CollectionInterface
 }
 
-func NewUserRepository(database *mongo.Database, collection string) domain.UserRepository {
-	return &UserRepository{collection: database.Collection(collection)}
+func NewUserRepository(collection CollectionInterface) domain.UserRepository {
+	return &UserRepository{collection: collection}
 }
 
 func(userrepo *UserRepository) CreateUser(ctx context.Context, user *domain.User) (primitive.ObjectID, error) {
@@ -31,7 +30,7 @@ func(userrepo *UserRepository) CreateUser(ctx context.Context, user *domain.User
 	return result.InsertedID.(primitive.ObjectID), nil
 
 }
-func(userrepo *UserRepository) GetUser(ctx context.Context, userID primitive.ObjectID) (*domain.User, error){
+func(userrepo *UserRepository) GetUserByID(ctx context.Context, userID primitive.ObjectID) (*domain.User, error){
 
 	collection := userrepo.collection
 
