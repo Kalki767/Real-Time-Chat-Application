@@ -19,23 +19,31 @@ import (
 func TestCreateChat(t *testing.T) {
 	// Setup
 	mockCollection := new(mocks.MockCollection)
-	repo := repository.NewChatRepository(mockCollection) // Pass the mock
+	repo := repository.NewChatRepository(mockCollection)
 
-	chat := &domain.Chat{
-		ChatID:           primitive.NewObjectID(),
-		Participants: []primitive.ObjectID{primitive.NewObjectID()},
-		Messages:     []domain.Message{},
-	}
+	SenderID := primitive.NewObjectID()
+	ReceiverID := primitive.NewObjectID()
+	chatID := primitive.NewObjectID()
+
+	// expectedChat := domain.Chat{
+	// 	Participants: []primitive.ObjectID{SenderID, ReceiverID},
+	// 	Messages:     []domain.Message{},
+	// }
 
 	// Mock InsertOne to return a successful result
-	mockCollection.On("InsertOne", mock.Anything, chat).Return(&mongo.InsertOneResult{InsertedID: chat.ChatID}, nil)
+	mockCollection.On("InsertOne", mock.Anything, mock.MatchedBy(func(chat domain.Chat) bool {
+		// Verify the chat object has the expected participants
+		return len(chat.Participants) == 2 &&
+			chat.Participants[0] == SenderID &&
+			chat.Participants[1] == ReceiverID
+	})).Return(&mongo.InsertOneResult{InsertedID: chatID}, nil)
 
 	// Execute
-	insertedID, err := repo.CreateChat(context.TODO(), chat)
+	insertedID, err := repo.CreateChat(context.TODO(), SenderID, ReceiverID)
 
 	// Verify
 	assert.NoError(t, err)
-	assert.Equal(t, chat.ChatID, insertedID)
+	assert.Equal(t, chatID, insertedID)
 	mockCollection.AssertExpectations(t)
 }
 
@@ -163,3 +171,45 @@ func TestDeleteChat(t *testing.T) {
 	assert.NoError(t, err)
 	mockCollection.AssertExpectations(t)
 }
+
+func TestGetChatByParticipants(t *testing.T) {
+	// Setup
+	mockCollection := new(mocks.MockCollection)
+	mockSingleResult := new(mocks.MockSingleResult)
+	repo := repository.NewChatRepository(mockCollection)
+
+	SenderID := primitive.NewObjectID()
+	ReceiverID := primitive.NewObjectID()
+	chatID := primitive.NewObjectID()
+
+	// Create a mock chat
+	expectedChat := &domain.Chat{
+		ChatID:       chatID,
+		Participants: []primitive.ObjectID{SenderID, ReceiverID},
+		Messages:     []domain.Message{},
+	}
+
+	// Mock FindOne
+	mockCollection.On("FindOne", mock.Anything, bson.M{
+		"participants": bson.M{
+			"$all":  []primitive.ObjectID{SenderID, ReceiverID},
+			"$size": 2,
+		},
+	}).Return(mockSingleResult)
+
+	// Mock Decode to return the expected chat
+	mockSingleResult.On("Decode", mock.AnythingOfType("*domain.Chat")).Run(func(args mock.Arguments) {
+		chat := args.Get(0).(*domain.Chat)
+		*chat = *expectedChat
+	}).Return(nil)
+
+	// Execute
+	chat, err := repo.GetChatByParticipants(context.TODO(), SenderID, ReceiverID)
+
+	// Verify
+	assert.NoError(t, err)
+	assert.Equal(t, expectedChat, chat)
+	mockCollection.AssertExpectations(t)
+	mockSingleResult.AssertExpectations(t)
+}
+
