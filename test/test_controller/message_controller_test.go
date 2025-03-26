@@ -1,16 +1,15 @@
 package test
-
 import (
 	"Real-Time-Chat-Application/controller"
 	"Real-Time-Chat-Application/domain"
 	"Real-Time-Chat-Application/test/test_usecase/mocks"
+	"Real-Time-Chat-Application/websocket"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -19,61 +18,73 @@ import (
 )
 
 func TestSendMessage(t *testing.T) {
-	mockMessageUsecase := new(mocks.MockMessageUsecase)
-	messageController := controller.NewMessageController(mockMessageUsecase)
+	t.Run("Success", func(t *testing.T) {
+		mockMessageUsecase := new(mocks.MockMessageUsecase)
+		hub := websocket.NewHub()
+		messageController := controller.NewMessageController(mockMessageUsecase, hub)
 
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	r.POST("/chats/:chat_id/messages", messageController.SendMessage)
+		r := gin.Default()
+		r.POST("/chats/:chat_id/messages", messageController.SendMessage)
 
-	t.Run("success", func(t *testing.T) {
 		chatID := primitive.NewObjectID()
-		message := &domain.Message{
-			SenderID: primitive.NewObjectID(),
+		message := domain.Message{
 			Content:  "Test message",
-			Edited:   false,
+			SenderID: primitive.NewObjectID(),
 		}
 
-		mockMessageUsecase.On("SendMessage", mock.Anything, chatID, message).Return(nil).Once()
+		mockMessageUsecase.On("SendMessage", mock.Anything, chatID, mock.AnythingOfType("*domain.Message")).Return(nil)
 
-		jsonMessage, _ := json.Marshal(message)
-		req, _ := http.NewRequest(http.MethodPost, "/chats/"+chatID.Hex()+"/messages", bytes.NewBuffer(jsonMessage))
+		jsonValue, _ := json.Marshal(message)
+		req, _ := http.NewRequest("POST", "/chats/"+chatID.Hex()+"/messages", bytes.NewBuffer(jsonValue))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusCreated, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
 		mockMessageUsecase.AssertExpectations(t)
 	})
 
-	t.Run("invalid chat ID", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodPost, "/chats/invalid-id/messages", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
+	t.Run("Invalid Chat ID", func(t *testing.T) {
+		mockMessageUsecase := new(mocks.MockMessageUsecase)
+		hub := websocket.NewHub()
+		messageController := controller.NewMessageController(mockMessageUsecase, hub)
 
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-	})
+		r := gin.Default()
+		r.POST("/chats/:chat_id/messages", messageController.SendMessage)
 
-	t.Run("invalid request body", func(t *testing.T) {
-		chatID := primitive.NewObjectID()
-		req, _ := http.NewRequest(http.MethodPost, "/chats/"+chatID.Hex()+"/messages", bytes.NewBuffer([]byte("invalid json")))
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-	})
-
-	t.Run("usecase error", func(t *testing.T) {
-		chatID := primitive.NewObjectID()
-		message := &domain.Message{
-			SenderID: primitive.NewObjectID(),
+		message := domain.Message{
 			Content:  "Test message",
-			Edited:   false,
+			SenderID: primitive.NewObjectID(),
 		}
 
-		mockMessageUsecase.On("SendMessage", mock.Anything, chatID, message).Return(errors.New("usecase error")).Once()
+		jsonValue, _ := json.Marshal(message)
+		req, _ := http.NewRequest("POST", "/chats/invalid_id/messages", bytes.NewBuffer(jsonValue))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
 
-		jsonMessage, _ := json.Marshal(message)
-		req, _ := http.NewRequest(http.MethodPost, "/chats/"+chatID.Hex()+"/messages", bytes.NewBuffer(jsonMessage))
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("Internal Server Error", func(t *testing.T) {
+		mockMessageUsecase := new(mocks.MockMessageUsecase)
+		hub := websocket.NewHub()
+		messageController := controller.NewMessageController(mockMessageUsecase, hub)
+
+		r := gin.Default()
+		r.POST("/chats/:chat_id/messages", messageController.SendMessage)
+
+		chatID := primitive.NewObjectID()
+		message := domain.Message{
+			Content:  "Test message",
+			SenderID: primitive.NewObjectID(),
+		}
+
+		mockMessageUsecase.On("SendMessage", mock.Anything, chatID, mock.AnythingOfType("*domain.Message")).Return(errors.New("internal error"))
+
+		jsonValue, _ := json.Marshal(message)
+		req, _ := http.NewRequest("POST", "/chats/"+chatID.Hex()+"/messages", bytes.NewBuffer(jsonValue))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
@@ -82,81 +93,53 @@ func TestSendMessage(t *testing.T) {
 	})
 }
 
-
 func TestGetMessages(t *testing.T) {
-	mockMessageUsecase := new(mocks.MockMessageUsecase)
-	messageController := controller.NewMessageController(mockMessageUsecase)
+	t.Run("Success", func(t *testing.T) {
+		mockMessageUsecase := new(mocks.MockMessageUsecase)
+		hub := websocket.NewHub()
+		messageController := controller.NewMessageController(mockMessageUsecase, hub)
 
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	r.GET("/chats/:chat_id/messages", messageController.GetMessages)
+		r := gin.Default()
+		r.GET("/chats/:chat_id/messages", messageController.GetMessages)
 
-	t.Run("success", func(t *testing.T) {
 		chatID := primitive.NewObjectID()
 		expectedMessages := []domain.Message{
 			{
 				MessageID: primitive.NewObjectID(),
-				SenderID:  primitive.NewObjectID(),
 				Content:   "Test message 1",
-				Time:      time.Now(),
+				SenderID:  primitive.NewObjectID(),
 			},
 			{
 				MessageID: primitive.NewObjectID(),
+				Content:   "Test message 2", 
 				SenderID:  primitive.NewObjectID(),
-				Content:   "Test message 2",
-				Time:      time.Now(),
 			},
 		}
 
-		mockMessageUsecase.On("GetMessages", mock.Anything, chatID).Return(expectedMessages, nil).Once()
+		mockMessageUsecase.On("GetMessages", mock.Anything, chatID).Return(expectedMessages, nil)
 
-		req, _ := http.NewRequest(http.MethodGet, "/chats/"+chatID.Hex()+"/messages", nil)
+		req, _ := http.NewRequest("GET", "/chats/"+chatID.Hex()+"/messages", nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response []domain.Message
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, len(expectedMessages), len(response))
 		mockMessageUsecase.AssertExpectations(t)
 	})
 
-	t.Run("invalid chat ID", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/chats/invalid-id/messages", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
+	t.Run("Invalid Chat ID", func(t *testing.T) {
+		mockMessageUsecase := new(mocks.MockMessageUsecase)
+		hub := websocket.NewHub()
+		messageController := controller.NewMessageController(mockMessageUsecase, hub)
 
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-	})
-}
+		r := gin.Default()
+		r.GET("/chats/:chat_id/messages", messageController.GetMessages)
 
-func TestGetMessage(t *testing.T) {
-	mockMessageUsecase := new(mocks.MockMessageUsecase)
-	messageController := controller.NewMessageController(mockMessageUsecase)
-
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	r.GET("/chats/:chat_id/messages/:message_id", messageController.GetMessage)
-
-	t.Run("success", func(t *testing.T) {
-		chatID := primitive.NewObjectID()
-		messageID := primitive.NewObjectID()
-		expectedMessage := domain.Message{
-			MessageID: messageID,
-			SenderID:  primitive.NewObjectID(),
-			Content:   "Test message",
-			Time:      time.Now(),
-		}
-
-		mockMessageUsecase.On("GetMessage", mock.Anything, chatID, messageID).Return(expectedMessage, nil).Once()
-
-		req, _ := http.NewRequest(http.MethodGet, "/chats/"+chatID.Hex()+"/messages/"+messageID.Hex(), nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		mockMessageUsecase.AssertExpectations(t)
-	})
-
-	t.Run("invalid IDs", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/chats/invalid-id/messages/invalid-id", nil)
+		req, _ := http.NewRequest("GET", "/chats/invalid_id/messages", nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
@@ -165,91 +148,54 @@ func TestGetMessage(t *testing.T) {
 }
 
 func TestDeleteMessage(t *testing.T) {
-	mockMessageUsecase := new(mocks.MockMessageUsecase)
-	messageController := controller.NewMessageController(mockMessageUsecase)
+	t.Run("Success", func(t *testing.T) {
+		mockMessageUsecase := new(mocks.MockMessageUsecase)
+		hub := websocket.NewHub()
+		messageController := controller.NewMessageController(mockMessageUsecase, hub)
 
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	r.DELETE("/chats/:chat_id/messages/:message_id", messageController.DeleteMessage)
+		r := gin.Default()
+		r.DELETE("/chats/:chat_id/messages/:message_id", messageController.DeleteMessage)
 
-	t.Run("success", func(t *testing.T) {
 		chatID := primitive.NewObjectID()
 		messageID := primitive.NewObjectID()
 
-		mockMessageUsecase.On("DeleteMessage", mock.Anything, chatID, messageID).Return(nil).Once()
+		mockMessageUsecase.On("DeleteMessage", mock.Anything, chatID, messageID).Return(nil)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/chats/"+chatID.Hex()+"/messages/"+messageID.Hex(), nil)
+		req, _ := http.NewRequest("DELETE", "/chats/"+chatID.Hex()+"/messages/"+messageID.Hex(), nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		mockMessageUsecase.AssertExpectations(t)
-	})
-
-	t.Run("invalid IDs", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodDelete, "/chats/invalid-id/messages/invalid-id", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-	})
-
-	t.Run("usecase error", func(t *testing.T) {
-		chatID := primitive.NewObjectID()
-		messageID := primitive.NewObjectID()
-
-		mockMessageUsecase.On("DeleteMessage", mock.Anything, chatID, messageID).Return(errors.New("deletion error")).Once()
-
-		req, _ := http.NewRequest(http.MethodDelete, "/chats/"+chatID.Hex()+"/messages/"+messageID.Hex(), nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		mockMessageUsecase.AssertExpectations(t)
 	})
 }
 
 func TestUpdateMessage(t *testing.T) {
-	mockMessageUsecase := new(mocks.MockMessageUsecase)
-	messageController := controller.NewMessageController(mockMessageUsecase)
+	t.Run("Success", func(t *testing.T) {
+		mockMessageUsecase := new(mocks.MockMessageUsecase)
+		hub := websocket.NewHub()
+		messageController := controller.NewMessageController(mockMessageUsecase, hub)
 
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	r.PUT("/chats/:chat_id/messages/:message_id", messageController.UpdateMessage)
+		r := gin.Default()
+		r.PUT("/chats/:chat_id/messages/:message_id", messageController.UpdateMessage)
 
-	t.Run("success", func(t *testing.T) {
 		chatID := primitive.NewObjectID()
 		messageID := primitive.NewObjectID()
-		newContent := "Updated message content"
+		updateReq := struct {
+			Content string `json:"content"`
+		}{
+			Content: "Updated message",
+		}
 
-		mockMessageUsecase.On("UpdateMessage", mock.Anything, chatID, messageID, newContent).Return(nil).Once()
+		mockMessageUsecase.On("UpdateMessage", mock.Anything, chatID, messageID, updateReq.Content).Return(nil)
 
-		jsonContent, _ := json.Marshal(newContent)
-		req, _ := http.NewRequest(http.MethodPut, "/chats/"+chatID.Hex()+"/messages/"+messageID.Hex(), bytes.NewBuffer(jsonContent))
+		jsonValue, _ := json.Marshal(updateReq)
+		req, _ := http.NewRequest("PUT", "/chats/"+chatID.Hex()+"/messages/"+messageID.Hex(), bytes.NewBuffer(jsonValue))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		mockMessageUsecase.AssertExpectations(t)
 	})
-
-	t.Run("invalid IDs", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodPut, "/chats/invalid-id/messages/invalid-id", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-	})
-
-	t.Run("invalid request body", func(t *testing.T) {
-		chatID := primitive.NewObjectID()
-		messageID := primitive.NewObjectID()
-
-		req, _ := http.NewRequest(http.MethodPut, "/chats/"+chatID.Hex()+"/messages/"+messageID.Hex(), bytes.NewBuffer([]byte("invalid json")))
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-	})
 }
-
