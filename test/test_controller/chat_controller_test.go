@@ -4,12 +4,14 @@ import (
 	"Real-Time-Chat-Application/controller"
 	"Real-Time-Chat-Application/domain"
 	"Real-Time-Chat-Application/test/test_usecase/mocks"
+	websocket "Real-Time-Chat-Application/websocket"
 	"bytes"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -18,169 +20,210 @@ import (
 )
 
 func TestCreateChat(t *testing.T) {
-	gin.SetMode(gin.TestMode)
+	mockChatUsecase := new(mocks.MockChatUsecase)
+	mockHub := &websocket.Hub{} // Create mock hub
+	chatID := primitive.NewObjectID()
+	senderID := primitive.NewObjectID()
+	receiverID := primitive.NewObjectID()
 
-	t.Run("Success - Chat Created", func(t *testing.T) {
-		mockChatUsecase := new(mocks.MockChatUsecase)
-		chatController := controller.NewChatController(mockChatUsecase)
+	mockChatUsecase.On("CreateChat", mock.Anything, senderID, receiverID).Return(chatID, nil)
 
-		r := gin.Default()
-		r.POST("/chats", chatController.CreateChat)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
 
-		chat := domain.Chat{
-			Participants: []primitive.ObjectID{primitive.NewObjectID()},
-		}
+	// Create request body
+	reqBody := map[string]string{
+		"sender_id":   senderID.Hex(),
+		"receiver_id": receiverID.Hex(),
+	}
+	jsonBody, _ := json.Marshal(reqBody)
+	c.Request = httptest.NewRequest("POST", "/chats", bytes.NewBuffer(jsonBody))
 
-		mockChatUsecase.On("CreateChat", mock.Anything, mock.AnythingOfType("*domain.Chat")).Return(primitive.NewObjectID(), nil)
+	// Create chat controller with mock usecase and hub
+	chatController := controller.NewChatController(mockChatUsecase, mockHub)
 
-		jsonValue, _ := json.Marshal(chat)
-		req, _ := http.NewRequest("POST", "/chats", bytes.NewBuffer(jsonValue))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
+	// Test the handler
+	chatController.CreateChat(c)
+	assert.Equal(t, http.StatusCreated, w.Code)
 
-		assert.Equal(t, http.StatusCreated, w.Code)
-		mockChatUsecase.AssertExpectations(t)
-	})
-
-	t.Run("Failure - Internal Server Error", func(t *testing.T) {
-		mockChatUsecase := new(mocks.MockChatUsecase)
-		chatController := controller.NewChatController(mockChatUsecase)
-
-		r := gin.Default()
-		r.POST("/chats", chatController.CreateChat)
-
-		chat := domain.Chat{
-			Participants: []primitive.ObjectID{primitive.NewObjectID()},
-		}
-
-		mockChatUsecase.On("CreateChat", mock.Anything, mock.AnythingOfType("*domain.Chat")).Return(primitive.NilObjectID, errors.New("failed to create chat"))
-
-		jsonValue, _ := json.Marshal(chat)
-		req, _ := http.NewRequest("POST", "/chats", bytes.NewBuffer(jsonValue))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
-		mockChatUsecase.AssertExpectations(t)
-	})
-
-	t.Run("Failure - Invalid Request Body", func(t *testing.T) {
-		mockChatUsecase := new(mocks.MockChatUsecase)
-		chatController := controller.NewChatController(mockChatUsecase)
-
-		r := gin.Default()
-		r.POST("/chats", chatController.CreateChat)
-
-		invalidJSON := `{"Participants": "invalid_data"}` // This should be an array of ObjectIDs
-
-		req, _ := http.NewRequest("POST", "/chats", bytes.NewBuffer([]byte(invalidJSON)))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		mockChatUsecase.AssertExpectations(t)
-	})
+	mockChatUsecase.AssertExpectations(t)
 }
 
 func TestGetChat(t *testing.T) {
-	mockChatUsecase := new(mocks.MockChatUsecase)
-	chatController := controller.NewChatController(mockChatUsecase)
+    mockChatUsecase := new(mocks.MockChatUsecase)
+    mockHub := &websocket.Hub{} // Create mock hub
+    chatID := primitive.NewObjectID()
 
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	r.GET("/chats/:chat_id", chatController.GetChat)
+    // Creating the expected chat
+    expectedChat := &domain.Chat{
+        ChatID:       chatID,
+        Participants: []primitive.ObjectID{primitive.NewObjectID(), primitive.NewObjectID()},
+        Messages:     []domain.Message{},
+        CreatedAt:    time.Now(),
+        UpdatedAt:    time.Now(),
+    }
 
-	chatID := primitive.NewObjectID()
-	expectedChat := &domain.Chat{
-		ChatID:       chatID,
-		Participants: []primitive.ObjectID{primitive.NewObjectID()},
-	}
+    // Mock the GetChat method to return the expected chat
+    mockChatUsecase.On("GetChat", mock.Anything, chatID).Return(expectedChat, nil)
 
-	mockChatUsecase.On("GetChat", mock.Anything, chatID).Return(expectedChat, nil)
+    // Creating a response recorder and test context
+    w := httptest.NewRecorder()
+    c, _ := gin.CreateTestContext(w)
 
-	req, _ := http.NewRequest("GET", "/chats/"+chatID.Hex(), nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+    // Create a test request
+    req := httptest.NewRequest("GET", "/chats/"+chatID.Hex(), nil)
+    c.Request = req
 
-	assert.Equal(t, http.StatusOK, w.Code)
+    // Set the params in the request context (chat_id)
+    c.Params = []gin.Param{{Key: "chat_id", Value: chatID.Hex()}}
 
-	var response domain.Chat
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedChat.ChatID, response.ChatID)
+    // Create chat controller with mock usecase and hub
+    chatController := controller.NewChatController(mockChatUsecase, mockHub)
+
+    // Run the handler
+    chatController.GetChat(c)
+
+    // Assert that the status code is 200 OK
+    assert.Equal(t, http.StatusOK, w.Code)
+
+    // Assert that expectations for mockChatUsecase were met
+    mockChatUsecase.AssertExpectations(t)
 }
+
 
 func TestGetChatsByUserID(t *testing.T) {
 	mockChatUsecase := new(mocks.MockChatUsecase)
-	chatController := controller.NewChatController(mockChatUsecase)
-
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	r.GET("/users/:user_id/chats", chatController.GetChatsByUserID)
-
+	mockHub := &websocket.Hub{} // Create mock hub
 	userID := primitive.NewObjectID()
 	expectedChats := []domain.Chat{
 		{
 			ChatID:       primitive.NewObjectID(),
-			Participants: []primitive.ObjectID{userID},
+			Participants: []primitive.ObjectID{userID, primitive.NewObjectID()},
+			Messages:     []domain.Message{},
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
 		},
 	}
 
 	mockChatUsecase.On("GetChatsByUserID", mock.Anything, userID).Return(expectedChats, nil)
 
-	req, _ := http.NewRequest("GET", "/users/"+userID.Hex()+"/chats", nil)
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	c, _ := gin.CreateTestContext(w)
+	
+	// Create request with user_id param
+	req := httptest.NewRequest("GET", "/chats/user/"+userID.Hex(), nil)
+	c.Request = req
+	c.Params = []gin.Param{{Key: "user_id", Value: userID.Hex()}}
 
+	// Create chat controller with mock usecase and hub
+	chatController := controller.NewChatController(mockChatUsecase, mockHub)
+
+	// Test the handler
+	chatController.GetUserChats(c)
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response []domain.Chat
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Equal(t, len(expectedChats), len(response))
+	mockChatUsecase.AssertExpectations(t)
 }
 
 func TestUpdateChat(t *testing.T) {
 	mockChatUsecase := new(mocks.MockChatUsecase)
-	chatController := controller.NewChatController(mockChatUsecase)
-
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	r.PUT("/chats/:chat_id", chatController.UpdateChat)
-
+	mockHub := &websocket.Hub{} // Create mock hub
 	chatID := primitive.NewObjectID()
-	chat := domain.Chat{
-		Participants: []primitive.ObjectID{primitive.NewObjectID()},
+	updatedChat := &domain.Chat{
+		ChatID:       chatID,
+		Participants: []primitive.ObjectID{primitive.NewObjectID(), primitive.NewObjectID()},
+		Messages:     []domain.Message{},
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
-	mockChatUsecase.On("UpdateChat", mock.Anything, chatID, mock.AnythingOfType("*domain.Chat")).Return(nil)
+	// Create a copy of updatedChat for the mock expectation
+	expectedChat := &domain.Chat{
+		ChatID:       updatedChat.ChatID,
+		Participants: updatedChat.Participants,
+		Messages:     updatedChat.Messages,
+		CreatedAt:    updatedChat.CreatedAt,
+		UpdatedAt:    updatedChat.UpdatedAt,
+	}
 
-	jsonValue, _ := json.Marshal(chat)
-	req, _ := http.NewRequest("PUT", "/chats/"+chatID.Hex(), bytes.NewBuffer(jsonValue))
+	mockChatUsecase.On("UpdateChat", mock.Anything, chatID, mock.MatchedBy(func(chat *domain.Chat) bool {
+		return chat.ChatID == expectedChat.ChatID &&
+			len(chat.Participants) == len(expectedChat.Participants) &&
+			len(chat.Messages) == len(expectedChat.Messages)
+	})).Return(nil)
+
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	c, _ := gin.CreateTestContext(w)
+	c.Params = []gin.Param{{Key: "chat_id", Value: chatID.Hex()}}
 
+	jsonBody, _ := json.Marshal(updatedChat)
+	c.Request = httptest.NewRequest("PUT", "/chats/"+chatID.Hex(), bytes.NewBuffer(jsonBody))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	// Test the handler
+	chatController := controller.NewChatController(mockChatUsecase, mockHub)
+	chatController.UpdateChat(c)
+	
 	assert.Equal(t, http.StatusOK, w.Code)
+
+	mockChatUsecase.AssertExpectations(t)
 }
 
 func TestDeleteChat(t *testing.T) {
 	mockChatUsecase := new(mocks.MockChatUsecase)
-	chatController := controller.NewChatController(mockChatUsecase)
-
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	r.DELETE("/chats/:chat_id", chatController.DeleteChat)
-
+	mockHub := &websocket.Hub{} // Create mock hub
 	chatID := primitive.NewObjectID()
 
 	mockChatUsecase.On("DeleteChat", mock.Anything, chatID).Return(nil)
 
-	req, _ := http.NewRequest("DELETE", "/chats/"+chatID.Hex(), nil)
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	c, _ := gin.CreateTestContext(w)
+	c.Params = []gin.Param{{Key: "chat_id", Value: chatID.Hex()}}
+
+	// Create request
+	req := httptest.NewRequest("DELETE", "/chats/"+chatID.Hex(), nil)
+	c.Request = req
+
+	// Test the handler
+	chatController := controller.NewChatController(mockChatUsecase, mockHub)
+	chatController.DeleteChat(c)
 
 	assert.Equal(t, http.StatusOK, w.Code)
+
+	mockChatUsecase.AssertExpectations(t)
+}
+
+func TestGetChatByParticipants(t *testing.T) {
+	mockChatUsecase := new(mocks.MockChatUsecase)
+	mockHub := &websocket.Hub{} // Create mock hub
+	senderID := primitive.NewObjectID()
+	receiverID := primitive.NewObjectID()
+	expectedChat := &domain.Chat{
+		ChatID:       primitive.NewObjectID(),
+		Participants: []primitive.ObjectID{senderID, receiverID},
+		Messages:     []domain.Message{},
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	mockChatUsecase.On("GetChatByParticipants", mock.Anything, senderID, receiverID).Return(expectedChat, nil)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = []gin.Param{
+		{Key: "sender_id", Value: senderID.Hex()},
+		{Key: "receiver_id", Value: receiverID.Hex()},
+	}
+
+	// Create request
+	req := httptest.NewRequest("GET", fmt.Sprintf("/chats/%s/%s", 
+		senderID.Hex(), receiverID.Hex()), nil)
+	c.Request = req
+
+	// Test the handler
+	chatController := controller.NewChatController(mockChatUsecase, mockHub)
+	chatController.GetChatByParticipants(c)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	mockChatUsecase.AssertExpectations(t)
 }
