@@ -24,10 +24,11 @@ func TestCreateChat(t *testing.T) {
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
+	SenderID := primitive.NewObjectID()
+	ReceiverID := primitive.NewObjectID()
+	mockChatRepository.On("CreateChat", mock.Anything, SenderID, ReceiverID).Return(chat.ChatID, nil)
 
-	mockChatRepository.On("CreateChat", mock.Anything, &chat).Return(chat.ChatID, nil)
-
-	chatID, err := chatUsecase.CreateChat(context.Background(), &chat)
+	chatID, err := chatUsecase.CreateChat(context.Background(), SenderID, ReceiverID)
 	assert.NoError(t, err)
 	assert.Equal(t, chat.ChatID, chatID)
 	mockChatRepository.AssertExpectations(t)
@@ -110,6 +111,24 @@ func TestDeleteChat(t *testing.T) {
 }
 
 
+func TestGetChatByParticipants(t *testing.T) {
+	mockChatRepository := new(mocks.MockChatRepository)
+	chatUsecase := usecase.NewChatUsecase(mockChatRepository, 1*time.Second)
 
+	SenderID := primitive.NewObjectID()
+	ReceiverID := primitive.NewObjectID()
+	chatID := primitive.NewObjectID()
+	expectedChat := domain.Chat{
+		ChatID:       chatID,
+		Participants: []primitive.ObjectID{SenderID, ReceiverID},
+		Messages:     []domain.Message{},
+	}
 
+	mockChatRepository.On("GetChatByParticipants", mock.Anything, SenderID, ReceiverID).Return(&expectedChat, nil)
+
+	chat, err := chatUsecase.GetChatByParticipants(context.Background(), SenderID, ReceiverID)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedChat, *chat)
+	mockChatRepository.AssertExpectations(t)
+}
 
