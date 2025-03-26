@@ -4,6 +4,7 @@ import (
 	"Real-Time-Chat-Application/domain"
 	"context"
 	"fmt"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -19,9 +20,16 @@ func NewChatRepository(collection CollectionInterface) domain.ChatRepository {
 	return &ChatRepository{collection: collection}
 }
 
-func(chatrepo *ChatRepository) CreateChat(ctx context.Context,chat *domain.Chat) (primitive.ObjectID, error) {
+func(chatrepo *ChatRepository) CreateChat(ctx context.Context, SenderID primitive.ObjectID, ReceiverID primitive.ObjectID) (primitive.ObjectID, error) {
 
 	collection := chatrepo.collection
+
+	chat := domain.Chat{
+		Participants: []primitive.ObjectID{SenderID, ReceiverID},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Messages: []domain.Message{},
+	}
 
 	result, err := collection.InsertOne(ctx, chat)
 	if err != nil {
@@ -85,4 +93,25 @@ func(chatrepo *ChatRepository) DeleteChat(ctx context.Context, chatID primitive.
 	}
 	return nil
 
+}
+func(chatrepo *ChatRepository) GetChatByParticipants(ctx context.Context, SenderID primitive.ObjectID, ReceiverID primitive.ObjectID) (*domain.Chat, error) {
+	collection := chatrepo.collection
+	var chat domain.Chat
+
+	filter := bson.M{
+		"participants": bson.M{
+			"$all": []primitive.ObjectID{SenderID, ReceiverID},
+			"$size": 2,
+		},
+	}
+
+	err := collection.FindOne(ctx, filter).Decode(&chat)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("chat not found")
+		}
+		return nil, fmt.Errorf("failed to fetch chat: %w", err)
+	}
+
+	return &chat, nil
 }
