@@ -20,11 +20,11 @@ func NewChatUsecase(chatRepository domain.ChatRepository, timeout time.Duration)
 	}
 }
 
-func (chatusecase *ChatUsecase) CreateChat(ctx context.Context, chat *domain.Chat) (primitive.ObjectID, error) {
+func (chatusecase *ChatUsecase) CreateChat(ctx context.Context, SenderID primitive.ObjectID, ReceiverID primitive.ObjectID) (primitive.ObjectID, error) {
 	ctx, cancel := context.WithTimeout(ctx, chatusecase.contextTimeout)
 	defer cancel()
 
-	chatID, err := chatusecase.chatRepository.CreateChat(ctx, chat)
+	chatID, err := chatusecase.chatRepository.CreateChat(ctx, SenderID, ReceiverID)
 	if err != nil {
 		return primitive.NilObjectID, err
 	}
@@ -74,6 +74,19 @@ func (chatusecase *ChatUsecase) DeleteChat(ctx context.Context, chatID primitive
 	}
 	return nil
 }
+
+func (chatusecase *ChatUsecase) GetChatByParticipants(ctx context.Context, SenderID primitive.ObjectID, ReceiverID primitive.ObjectID) (*domain.Chat, error) {
+	ctx, cancel := context.WithTimeout(ctx, chatusecase.contextTimeout)
+	defer cancel()
+
+	chat, err := chatusecase.chatRepository.GetChatByParticipants(ctx, SenderID, ReceiverID)
+	if err != nil {
+		return nil, err
+	}
+	return chat, nil
+}
+
+
 
 
 
