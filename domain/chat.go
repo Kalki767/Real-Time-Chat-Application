@@ -17,17 +17,19 @@ type Chat struct {
 }
 
 type ChatRepository interface {
-	CreateChat(ctx context.Context, chat *Chat) (primitive.ObjectID, error)
+	CreateChat(ctx context.Context, SenderID primitive.ObjectID, ReceiverID primitive.ObjectID) (primitive.ObjectID, error)
 	GetChat(ctx context.Context, chatID primitive.ObjectID) (*Chat, error)
 	GetChatsByUserID(ctx context.Context, userID primitive.ObjectID) ([]Chat, error)
+	GetChatByParticipants(ctx context.Context, SenderID primitive.ObjectID, ReceiverID primitive.ObjectID) (*Chat, error)
 	UpdateChat(ctx context.Context, chatID primitive.ObjectID, chat *Chat) error
 	DeleteChat(ctx context.Context, chatID primitive.ObjectID) error
 }
 
 type ChatUsecase interface {
-	CreateChat(ctx context.Context, chat *Chat) (primitive.ObjectID, error)
+	CreateChat(ctx context.Context, SenderID primitive.ObjectID, ReceiverID primitive.ObjectID) (primitive.ObjectID, error)
 	GetChat(ctx context.Context, chatID primitive.ObjectID) (*Chat, error)
 	GetChatsByUserID(ctx context.Context, userID primitive.ObjectID) ([]Chat, error)
+	GetChatByParticipants(ctx context.Context, SenderID primitive.ObjectID, ReceiverID primitive.ObjectID) (*Chat, error)
 	UpdateChat(ctx context.Context, chatID primitive.ObjectID, chat *Chat) error
 	DeleteChat(ctx context.Context, chatID primitive.ObjectID) error
 }
